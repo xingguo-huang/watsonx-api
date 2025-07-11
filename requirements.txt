@@ -1,0 +1,9 @@
+fastapi>=0.110,<0.112          # 0.110+ fully supports Pydantic v2
+uvicorn>=0.27,<0.28
+pydantic>=2.7.4,<3.0.0
+pydantic-settings>=2.2,<3.0    # 2.2+ matches new pydantic core
+python-dotenv>=1.0,<2.0
+langchain>=0.3,<0.4
+langchain-ibm>=0.3,<0.4
+ibm-watsonx-ai>=1.3.28,<2.0.0  # Version required by langchain-ibm 0.3.x
+httpx>=0.27,<0.28
