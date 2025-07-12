@@ -21,6 +21,7 @@ coverage.xml
 env/
 venv/
 ENV/
+myVenv/
 
 # IDE specific files
 .idea/

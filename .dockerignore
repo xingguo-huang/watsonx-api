@@ -1,9 +1,14 @@
-__pycache__/
-*.py[cod]
-*.so
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
 .env
-.venv
+.env.*
 venv/
-.git
-tests/
+.git/
+.github/
+.pytest_cache/
+.coverage
+htmlcov/
 
