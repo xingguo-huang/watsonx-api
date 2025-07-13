@@ -33,3 +33,82 @@ B. [Option B]
 C. [Option C]
 D. [Option D]
 """
+
+# New lesson plan prompt template
+LESSON_PLAN_PROMPT = """
+You are an expert instructional designer specializing in {grade_level} education.
+
+INPUTS:
+1. Core Parameters:
+   - Topic: {topic}
+   - Duration: {duration} minutes total
+   - Grade Level: {grade_level}
+
+2. Teaching Approach:
+   - Selected Teaching Style(s): {style}
+   
+   * Understanding Teaching Styles:
+     - Expert: A teacher-centered approach where teachers hold knowledge and expertise, focusing on sharing knowledge and providing direct feedback.
+     - Formal Authority: A teacher-centered approach focused on lecturing in a structured environment, ideal for delivering large amounts of information efficiently.
+     - Personal Model: A teacher-centered approach using real-life examples with direct observation, where teacher acts as a coach/mentor.
+     - Facilitator: A student-centered approach focused on guiding critical thinking through activities, emphasizing teacher-student interactions.
+     - Delegator: A student-centered approach where teacher serves as an observer while students work independently or in groups.
+
+TASK:
+1) Create a detailed lesson plan that:
+   - Is appropriate for {grade_level} students
+   - Covers the topic "{topic}" thoroughly
+   - Can be completed in {duration} minutes
+   - Uses the "{style}" teaching style
+   - Includes 3-5 clear learning objectives
+   - Breaks down the lesson into logical phases
+   - Provides detailed descriptions of each phase's activities
+
+2) Create 3 multiple-choice assessment questions that:
+   - Test understanding of the lesson content
+   - Have 4 options each (A, B, C, D)
+   - Clearly mark the correct answer with an asterisk (*)
+
+RESPONSE FORMAT:
+Provide your response in JSON format as follows:
+
+```json
+{
+  "lesson_plan": {
+    "objectives": [
+      "Objective 1",
+      "Objective 2",
+      "Objective 3"
+    ],
+    "outline": [
+      {
+        "phase": "Introduction",
+        "duration": "10 minutes",
+        "purpose": "Engage students with the topic",
+        "description": "Detailed description of activities and teaching approach"
+      },
+      {
+        "phase": "Second Phase Name",
+        "duration": "15 minutes",
+        "purpose": "Purpose of this phase",
+        "description": "Detailed description"
+      }
+      // Additional phases as needed
+    ]
+  },
+  "questions": [
+    {
+      "question": "Question 1 text?",
+      "options": ["Option A", "Option B*", "Option C", "Option D"]
+    },
+    {
+      "question": "Question 2 text?",
+      "options": ["Option A", "Option B", "Option C*", "Option D"]
+    },
+    {
+      "question": "Question 3 text?",
+      "options": ["Option A*", "Option B", "Option C", "Option D"]
+    }
+  ]
+}
+"""
