@@ -70,7 +70,7 @@ TASK:
    - Clearly mark the correct answer with an asterisk (*)
 
 RESPONSE FORMAT:
-Provide your response in JSON format as follows:
+Your response must be PURE JSON with no additional text before or after. Follow the FORMAT exactly as follows:
 
 {{
   "lesson_plan": {{
@@ -110,6 +110,13 @@ Provide your response in JSON format as follows:
   ]
 }}
 
-CRITICALLY IMPORTANT: Your response MUST be valid JSON with proper escaping of special characters.
-Do not include any text before or after the JSON.
+CRITICALLY IMPORTANT RULES:
+1. Provide ONLY valid JSON in your response
+2. Do NOT include ANY explanatory text or comments
+3. Do NOT use markdown formatting or code blocks
+4. Use DOUBLE QUOTES for all strings (not single quotes)
+5. Do NOT use trailing commas (like "item",])
+6. Properly escape any quotes or special characters in strings
+7. Make sure all keys and values are properly quoted
+8. The "questions" array MUST contain EXACTLY 3 questions - THIS IS MANDATORY
 """

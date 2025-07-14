@@ -143,34 +143,38 @@ class WatsonXService:
             raise
     
     def _parse_lesson_plan_response(self, response: str) -> Tuple[LessonPlan, List[Question]]:
-        """Parse the LLM response into a lesson plan and questions."""
-        # Try to extract JSON from the response
+        """Parse the LLM response with enhanced error handling for malformed JSON."""
         try:
-            # Print full response for debugging
-            print(f"Full response to parse: {response}")
-            
-            # Try several approaches to find valid JSON
-            
-            # 1. Look for JSON between code blocks
+            # First attempt: Try to find JSON between triple backticks
             json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', response, re.DOTALL)
             if json_match:
                 json_content = json_match.group(1).strip()
-                print(f"Found JSON in code block: {json_content[:100]}...")
             else:
-                # 2. Try to find JSON object directly
-                json_match = re.search(r'(\{.*\})', response, re.DOTALL)
-                if json_match:
-                    json_content = json_match.group(1).strip()
-                    print(f"Found JSON object: {json_content[:100]}...")
+                # Second attempt: Find JSON by braces
+                start = response.find('{')
+                end = response.rfind('}') + 1
+                if start >= 0 and end > start:
+                    json_content = response[start:end]
                 else:
-                    # 3. Use the whole response as a last resort
-                    json_content = response.strip()
-                    print(f"Using whole response: {json_content[:100]}...")
+                    json_content = response
+        
+            # Enhanced JSON cleanup for common syntax errors
+            # Remove trailing commas before closing brackets (major cause of errors)
+            json_content = re.sub(r',(\s*[\]}])', r'\1', json_content)
             
-            # Parse the JSON
+            # Fix missing quotes around property names
+            json_content = re.sub(r'([{,]\s*)(\w+)(\s*:)', r'\1"\2"\3', json_content)
+            
+            # Fix single quotes to double quotes (careful with already escaped quotes)
+            json_content = re.sub(r"(?<!\\)'([^']*?)(?<!\\)'", r'"\1"', json_content)
+            
+            # Print debugging info
+            print(f"Cleaned JSON content (first 100 chars): {json_content[:100]}")
+            
+            # Try to parse the cleaned JSON
             data = json.loads(json_content)
             
-            # Extract lesson plan
+            # Process the data as before...
             lesson_plan = LessonPlan(
                 objectives=data["lesson_plan"]["objectives"],
                 outline=[
@@ -186,52 +190,65 @@ class WatsonXService:
             # Extract questions
             questions = []
             for q in data.get("questions", []):
-                # Handle different possible formats for questions
-                if isinstance(q, dict):
-                    if "question" in q and "options" in q:
-                        question_text = q["question"]
-                        options_list = q["options"]
-                        
-                        # Process options based on format
-                        processed_options = []
-                        for i, opt in enumerate(options_list):
-                            if isinstance(opt, str):
-                                # String format with asterisk marking
-                                is_correct = "*" in opt
-                                text = opt.replace("*", "").strip()
-                                processed_options.append(Option(
-                                    text=f"{chr(65+i)}. {text}",
-                                    is_correct=is_correct
-                                ))
-                            elif isinstance(opt, dict) and "text" in opt and "is_correct" in opt:
-                                # Object format
-                                processed_options.append(Option(
-                                    text=f"{chr(65+i)}. {opt['text']}",
-                                    is_correct=opt["is_correct"]
-                                ))
-                        
-                        questions.append(Question(
-                            question_text=question_text,
-                            options=processed_options
+                if "question" in q and "options" in q:
+                    options_list = []
+                    for i, opt in enumerate(q["options"]):
+                        is_correct = "*" in str(opt)
+                        text = str(opt).replace("*", "").strip()
+                        options_list.append(Option(
+                            text=f"{chr(65+i)}. {text}",
+                            is_correct=is_correct
                         ))
-            
+                
+                    questions.append(Question(
+                        question_text=q["question"],
+                        options=options_list
+                    ))
+        
             return lesson_plan, questions
-            
+        
         except Exception as e:
-            # Enhanced error handling with context
-            import traceback
-            print(f"JSON parse error: {str(e)}")
-            print(f"Traceback: {traceback.format_exc()}")
-            
-            # Return fallback lesson plan
-            return LessonPlan(
-                objectives=["Unable to generate lesson plan due to technical error"],
-                outline=[
-                    Phase(
-                        phase="Error",
-                        duration="N/A",
-                        purpose="The lesson plan could not be generated",
-                        description=f"Error parsing response: {str(e)}"
-                    )
-                ]
-            ), []
+            # Fall back to regex-based extraction if JSON parsing fails
+            return self._fallback_regex_parse(response, str(e))
+    
+    def _fallback_regex_parse(self, response: str, error_msg: str) -> Tuple[LessonPlan, List[Question]]:
+        """Extract lesson plan data using regex when JSON parsing fails completely."""
+        try:
+            # Extract objectives with regex
+            objectives = []
+            obj_pattern = r'"objectives"\s*:\s*\[(.*?)\]'
+            obj_match = re.search(obj_pattern, response, re.DOTALL)
+            if obj_match:
+                obj_text = obj_match.group(1)
+                for m in re.finditer(r'"([^"]*)"', obj_text):
+                    objectives.append(m.group(1))
+        
+            # Extract phases with regex
+            phases = []
+            phase_pattern = r'"phase"\s*:\s*"([^"]*)"\s*,\s*"duration"\s*:\s*"([^"]*)"\s*,\s*"purpose"\s*:\s*"([^"]*)"\s*,\s*"description"\s*:\s*"([^"]*)"'
+            for m in re.finditer(phase_pattern, response, re.DOTALL):
+                phases.append(Phase(
+                    phase=m.group(1).strip(),
+                    duration=m.group(2).strip(),
+                    purpose=m.group(3).strip(),
+                    description=m.group(4).strip()
+                ))
+        
+            # If we found valid data, return it
+            if objectives and phases:
+                return LessonPlan(objectives=objectives, outline=phases), []
+        except:
+            pass
+    
+        # If all parsing attempts failed, return error information
+        return LessonPlan(
+            objectives=["Unable to generate lesson plan due to technical error"],
+            outline=[
+                Phase(
+                    phase="Error",
+                    duration="N/A",
+                    purpose="The lesson plan could not be generated",
+                    description=f"Error parsing response: {error_msg}"
+                )
+            ]
+        ), []
