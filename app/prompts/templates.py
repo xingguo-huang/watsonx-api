@@ -34,7 +34,7 @@ C. [Option C]
 D. [Option D]
 """
 
-# New lesson plan prompt template
+# filepath: /Users/xingguohuang/Downloads/watsonx-api/app/prompts/templates.py
 LESSON_PLAN_PROMPT = """
 You are an expert instructional designer specializing in {grade_level} education.
 
@@ -72,43 +72,44 @@ TASK:
 RESPONSE FORMAT:
 Provide your response in JSON format as follows:
 
-```json
-{
-  "lesson_plan": {
+{{
+  "lesson_plan": {{
     "objectives": [
       "Objective 1",
       "Objective 2",
       "Objective 3"
     ],
     "outline": [
-      {
+      {{
         "phase": "Introduction",
         "duration": "10 minutes",
         "purpose": "Engage students with the topic",
         "description": "Detailed description of activities and teaching approach"
-      },
-      {
+      }},
+      {{
         "phase": "Second Phase Name",
         "duration": "15 minutes",
         "purpose": "Purpose of this phase",
         "description": "Detailed description"
-      }
-      // Additional phases as needed
+      }}
     ]
-  },
+  }},
   "questions": [
-    {
+    {{
       "question": "Question 1 text?",
       "options": ["Option A", "Option B*", "Option C", "Option D"]
-    },
-    {
+    }},
+    {{
       "question": "Question 2 text?",
       "options": ["Option A", "Option B", "Option C*", "Option D"]
-    },
-    {
+    }},
+    {{
       "question": "Question 3 text?",
       "options": ["Option A*", "Option B", "Option C", "Option D"]
-    }
+    }}
   ]
-}
+}}
+
+CRITICALLY IMPORTANT: Your response MUST be valid JSON with proper escaping of special characters.
+Do not include any text before or after the JSON.
 """
