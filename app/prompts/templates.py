@@ -1,38 +1,97 @@
 # Prompt template for combined content and quiz generation
+
 COMBINED_GENERATION_PROMPT = """
-Generate educational content about the topic: {topic}.
+You are an educational quiz generator.
 
-First, write a well-structured paragraph of approximately 100 words that explains 
-key concepts about the topic in a clear, informative way suitable for beginners.
+TASK:
+1. Write a single paragraph (~100 words) that introduces the topic "{topic}".
+2. Write EXACTLY THREE multiple-choice questions ABOUT THAT PARAGRAPH.
+   • Each question must have four options labelled A, B, C, D.
+   • Put ONE AND ONLY ONE asterisk (*) after the correct option.
 
-Then, create EXACTLY THREE multiple-choice questions based only on the information 
-in your paragraph. Each question should have exactly four options (A, B, C, D), 
-with exactly one correct answer marked with an asterisk (*).
-
-FORMAT YOUR RESPONSE EXACTLY AS FOLLOWS:
+RESPONSE FORMAT (copy literally):
 
 CONTENT:
-[Your educational paragraph here]
+<paragraph>
 
 QUESTIONS:
-Q1: [Question text]
-A. [Option A]
-B. [Option B]*
-C. [Option C]
-D. [Option D]
+Q1: <question text>
+A. <option>*
+B. <option>
+C. <option>
+D. <option>
 
-Q2: [Question text]
-A. [Option A]
-B. [Option B]
-C. [Option C]*
-D. [Option D]
+Q2: <question text>
+A. <option>
+B. <option>*
+C. <option>
+D. <option>
 
-Q3: [Question text]
-A. [Option A]*
-B. [Option B]
-C. [Option C]
-D. [Option D]
+Q3: <question text>
+A. <option>
+B. <option>
+C. <option>
+D. <option>*
+
+EXAMPLE (DO NOT COPY TOPIC):
+CONTENT:
+Photosynthesis converts light energy into chemical energy in plants …
+
+QUESTIONS:
+Q1: What gas do plants absorb? 
+A. Oxygen
+B. Carbon dioxide*
+C. Nitrogen
+D. Helium
+
+Q2: Which molecule is produced? 
+A. Glucose*
+B. Protein
+C. DNA
+D. Starch
+
+Q3: Photosynthesis occurs in the … 
+A. Nucleus
+B. Mitochondria
+C. Chloroplast*
+D. Ribosome
 """
+
+
+# COMBINED_GENERATION_PROMPT = """
+# Generate educational content about the topic: {topic}.
+
+# First, write a well-structured paragraph of approximately 100 words that explains 
+# key concepts about the topic in a clear, informative way suitable for beginners.
+
+# Then, create EXACTLY THREE multiple-choice questions based only on the information 
+# in your paragraph. Each question should have exactly four options (A, B, C, D), 
+# with exactly one correct answer marked with an asterisk (*).
+
+# FORMAT YOUR RESPONSE EXACTLY AS FOLLOWS:
+
+# CONTENT:
+# [Your educational paragraph here]
+
+# QUESTIONS:
+# Q1: [Question text]
+# A. [Option A]
+# B. [Option B]*
+# C. [Option C]
+# D. [Option D]
+
+# Q2: [Question text]
+# A. [Option A]
+# B. [Option B]
+# C. [Option C]*
+# D. [Option D]
+
+# Q3: [Question text]
+# A. [Option A]*
+# B. [Option B]
+# C. [Option C]
+# D. [Option D]
+# """
 
 # filepath: /Users/xingguohuang/Downloads/watsonx-api/app/prompts/templates.py
 LESSON_PLAN_PROMPT = """
