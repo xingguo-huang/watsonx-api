@@ -16,22 +16,22 @@ CONTENT:
 
 QUESTIONS:
 Q1: <question text>
-A. <option>*
-B. <option>
-C. <option>
-D. <option>
+A. <option A>*
+B. <option B>
+C. <option C>
+D. <option D>
 
 Q2: <question text>
-A. <option>
-B. <option>*
-C. <option>
-D. <option>
+A. <option A>
+B. <option B>*
+C. <option C>
+D. <option D>
 
 Q3: <question text>
-A. <option>
-B. <option>
-C. <option>
-D. <option>*
+A. <option A>
+B. <option B>
+C. <option C>
+D. <option D>*
 
 EXAMPLE (DO NOT COPY TOPIC):
 CONTENT:
