@@ -4,7 +4,7 @@ COMBINED_GENERATION_PROMPT = """
 You are an educational quiz generator.
 
 TASK:
-1. Write a single paragraph (~100 words) that introduces the topic "{topic}".
+1. Write a single paragraph (~200 words) that introduces the topic "{topic}".
 2. Write EXACTLY THREE multiple-choice questions ABOUT THAT PARAGRAPH.
    • Each question must have four options labelled A, B, C, D.
    • Put ONE AND ONLY ONE asterisk (*) after the correct option.
@@ -178,4 +178,44 @@ CRITICALLY IMPORTANT RULES:
 6. Properly escape any quotes or special characters in strings
 7. Make sure all keys and values are properly quoted
 8. The "questions" array MUST contain EXACTLY 3 questions - THIS IS MANDATORY
+"""
+
+# Prompt template for content generation with web search results
+
+WEB_ENHANCED_GENERATION_PROMPT = """
+You are an educational content generator with access to the latest information from the web.
+
+CONTEXT FROM WEB SEARCH:
+{web_context}
+
+TASK:
+1. Using BOTH your knowledge and the web search results above, write a comprehensive and accurate paragraph (~200 words) that introduces the topic "{topic}".
+2. Ensure your content is factually accurate, up-to-date, and educational.
+3. After writing the content, create EXACTLY THREE multiple-choice questions based on this content.
+   • Each question must have four options labelled A, B, C, D.
+   • Put ONE AND ONLY ONE asterisk (*) after the correct option.
+
+RESPONSE FORMAT:
+
+CONTENT:
+<your well-researched paragraph that integrates information from web search>
+
+QUESTIONS:
+Q1: <question text>
+A. <option A>*
+B. <option B>
+C. <option C>
+D. <option D>
+
+Q2: <question text>
+A. <option A>
+B. <option B>*
+C. <option C>
+D. <option D>
+
+Q3: <question text>
+A. <option A>
+B. <option B>
+C. <option C>
+D. <option D>*
 """

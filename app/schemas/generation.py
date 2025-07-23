@@ -27,12 +27,14 @@ class LessonPlan(BaseModel):
 class GenerationRequest(BaseModel):
     topic: str = Field(..., description="Topic to generate content about")
     parameters: Optional[dict] = Field(default_factory=dict, description="Optional generation parameters")
+    use_web_context: bool = Field(False, description="Whether to use web search results for enhanced content")
 
 # Original content generation response
 class GenerationResponse(BaseModel):
     content: str
     questions: List[Question]
     topic: str
+    used_web_context: bool = Field(False, description="Whether web search results were used")
 
 # New lesson plan generation request
 class LessonPlanRequest(BaseModel):

@@ -7,7 +7,8 @@ import re
 
 from app.core.settings import settings
 from app.schemas.generation import Question, Option, Phase, LessonPlan
-from app.prompts.templates import COMBINED_GENERATION_PROMPT, LESSON_PLAN_PROMPT
+from app.prompts.templates import COMBINED_GENERATION_PROMPT, LESSON_PLAN_PROMPT, WEB_ENHANCED_GENERATION_PROMPT
+from app.services.google_search_service import GoogleSearchService
 
 
 class WatsonXService:
@@ -35,19 +36,30 @@ class WatsonXService:
             params=self.parameters
         )
 
-    async def generate_content_and_quiz(self, topic: str) -> Dict[str, Any]:
+        # Initialize Google Search service
+        self.google_search = GoogleSearchService()
+
+    async def generate_content_and_quiz(self, topic: str, use_web_context: bool = False) -> Dict[str, Any]:
         """Generate both content and quiz questions based on the given topic"""
         
-        # Create the prompt with instructions to generate both content and quiz
-        # prompt = (
-        #     f"Topic: {topic}\n\n"
-        #     "1. Generate a ~200 word educational paragraph about this topic.\n"
-        #     "2. Based on the paragraph, create 3 multiple-choice questions with 4 options each.\n"
-        #     "3. Mark the correct answer for each question with an asterisk (*).\n"
-        #     "Format your response with clear section headers for the content and questions."
-        # )
-
-        prompt = COMBINED_GENERATION_PROMPT.format(topic=topic)
+        web_context = ""
+        if use_web_context:
+            try:
+                print(f"Fetching web context for topic: {topic}")
+                web_context = self.google_search.search(topic)
+                print(f"Found {web_context.count('Source')} sources for web context")
+            except Exception as e:
+                print(f"Error fetching web context: {str(e)}")
+                # Continue without web context if there's an error
+        
+        # Choose appropriate prompt based on whether we have web context
+        if use_web_context and web_context:
+            prompt = WEB_ENHANCED_GENERATION_PROMPT.format(
+                topic=topic,
+                web_context=web_context
+            )
+        else:
+            prompt = COMBINED_GENERATION_PROMPT.format(topic=topic)
         
         # Call WatsonX LLM with the prompt
         response = await self.llm.ainvoke(prompt)
@@ -58,52 +70,194 @@ class WatsonXService:
         return {
             "content": content,
             "questions": questions,
-            "topic": topic
+            "topic": topic,
+            "used_web_context": use_web_context and bool(web_context)
         }
     
-    def _parse_response(self, response: str) -> tuple[str, list[Question]]:
-        """Parse the LLM response into content and questions."""
-        # Split into content and questions sections
-        parts = response.split("CONTENT:")
-        if len(parts) > 1:
-            parts = parts[1].split("QUESTIONS:")
-        else:
-            parts = response.split("QUESTIONS:")
-            
-        content = parts[0].strip() if len(parts) > 1 else ""
-        questions_text = parts[1].strip() if len(parts) > 1 else response
-        
-        # Parse questions
+    def _parse_response(self, response: str) -> Tuple[str, List[Question]]:
+        """Parse the LLM response with robust handling of malformed responses."""
+        content = ""
         questions = []
-        seen_questions = set()  # Track seen question texts to avoid duplicates
         
-        # Pattern to match questions
-        q_pattern = r'Q\d+:\s*(.*?)\s*\n\s*A\.\s*(.*?)\s*\n\s*B\.\s*(.*?)\s*\n\s*C\.\s*(.*?)\s*\n\s*D\.\s*(.*?)(?:\n|$)'
+        # STEP 1: Try normal structured parsing first
+        if "CONTENT:" in response and "QUESTIONS:" in response:
+            content = response.split("CONTENT:")[1].split("QUESTIONS:")[0].strip()
+            questions_text = response.split("QUESTIONS:")[1].strip()
+            questions = self._extract_questions_from_text(questions_text)
         
-        for match in re.finditer(q_pattern, questions_text, re.DOTALL):
-            question_text = match.group(1).strip()
+        # STEP 2: If we have content but no questions, check if questions are embedded in content
+        elif "CONTENT:" in response:
+            raw_content = response.split("CONTENT:")[1].strip()
+            content, embedded_questions = self._extract_embedded_questions(raw_content)
+            questions = embedded_questions
             
-            # Skip if we've seen this question already
-            if question_text in seen_questions:
-                continue
-            seen_questions.add(question_text)
-            
-            # Get options and check which one is marked as correct
-            options = []
-            for i, opt_text in enumerate(match.groups()[1:5]):
-                opt = opt_text.strip()
-                is_correct = opt.endswith('*')
-                if is_correct:
-                    opt = opt[:-1].strip()  # Remove the asterisk
-                options.append(Option(text=f"{chr(65+i)}. {opt}", is_correct=is_correct))
-            
-            questions.append(Question(question_text=f"Q{len(questions)+1}: {question_text}", options=options))
-            
-            # Stop after finding 3 questions
-            if len(questions) >= 3:
-                break
+        # STEP 3: If only questions section exists
+        elif "QUESTIONS:" in response:
+            questions_text = response.split("QUESTIONS:")[1].strip()
+            questions = self._extract_questions_from_text(questions_text)
         
+        # STEP 4: Unstructured response - try to parse the whole thing
+        else:
+            content, embedded_questions = self._extract_embedded_questions(response)
+            questions = embedded_questions
+        
+        # Ensure we have at most 3 questions
+        if len(questions) > 3:
+            questions = questions[:3]
+            
         return content, questions
+
+    def _extract_questions_from_text(self, text: str) -> List[Question]:
+        """Extract properly formatted questions from text."""
+        questions = []
+        seen_questions = set()
+        
+        # Standard pattern for Q1, Q2, etc. format
+        q_pattern = r'Q\d+:\s*(.*?)\s*\n\s*A\.\s*(.*?)\s*\n\s*B\.\s*(.*?)\s*\n\s*C\.\s*(.*?)\s*\n\s*D\.\s*(.*?)(?:\n|$)'
+        for match in re.finditer(q_pattern, text, re.DOTALL):
+            question = self._create_question_from_match(match, seen_questions)
+            if question:
+                questions.append(question)
+                if len(questions) >= 3:
+                    break
+                    
+        return questions
+
+    def _extract_embedded_questions(self, text: str) -> Tuple[str, List[Question]]:
+        """Extract questions that might be embedded within content text."""
+        cleaned_content = text
+        questions = []
+        seen_questions = set()
+        
+        # Find question-like patterns in the content
+        # Pattern 1: Q1, Q2, etc. format
+        q_pattern = r'Q\d+:\s*(.*?)\s*\n\s*A\.\s*(.*?)\s*\n\s*B\.\s*(.*?)\s*\n\s*C\.\s*(.*?)\s*\n\s*D\.\s*(.*?)(?:\n|$)'
+        for match in re.finditer(q_pattern, text, re.DOTALL):
+            question = self._create_question_from_match(match, seen_questions)
+            if question:
+                questions.append(question)
+                # Remove this question from content
+                full_match = match.group(0)
+                cleaned_content = cleaned_content.replace(full_match, "")
+        
+        # Pattern 2: Options without Q prefix (A. B. C. D. format) - common in malformed outputs
+        if len(questions) == 0:
+            option_pattern = r'(?:\n|^)([A-D])\.\s*(.*?)\s*\n\s*([A-D])\.\s*(.*?)\s*\n\s*([A-D])\.\s*(.*?)\s*\n\s*([A-D])\.\s*(.*?)(?:\n|$)'
+            option_matches = list(re.finditer(option_pattern, text, re.DOTALL))
+            
+            # If we find option patterns, try to group them into questions (3 sets of 4 options)
+            current_q_text = "Question about the topic"
+            
+            for i, match in enumerate(option_matches):
+                # Extract all option groups
+                options_data = []
+                correct_found = False
+                
+                # Process the 4 options (letters and texts)
+                for j in range(0, 8, 2):
+                    if j+1 < len(match.groups()):
+                        letter = match.group(j+1)
+                        option_text = match.group(j+2).strip()
+                        
+                        # Check for asterisk anywhere
+                        is_correct = "*" in option_text
+                        if is_correct:
+                            correct_found = True
+                            option_text = option_text.replace("*", "").strip()
+                        
+                        options_data.append((letter, option_text, is_correct))
+                
+                # If we found 4 options, create a question
+                if len(options_data) == 4:
+                    # Try to find a question text before this set of options
+                    context_before = text[:match.start()].strip()
+                    last_sentence = re.search(r'([^.!?]*[.!?])(?:\s|$)[^A-D]?$', context_before)
+                    
+                    if last_sentence:
+                        current_q_text = last_sentence.group(1).strip()
+                    
+                    options = []
+                    for letter, opt_text, is_correct in options_data:
+                        options.append(Option(
+                            text=f"{letter}. {opt_text}",
+                            is_correct=is_correct
+                        ))
+                    
+                    # Default to option A if no correct answer marked
+                    if not correct_found and options:
+                        options[0].is_correct = True
+                        print(f"Warning: No correct option marked for extracted question. Defaulting to option A.")
+                    
+                    questions.append(Question(
+                        question_text=f"Q{len(questions)+1}: {current_q_text}",
+                        options=options
+                    ))
+                    
+                    # Remove this question block from content
+                    full_match = match.group(0)
+                    cleaned_content = cleaned_content.replace(full_match, "")
+                    
+                    # Also remove the question text if we found it
+                    if last_sentence:
+                        cleaned_content = cleaned_content.replace(last_sentence.group(1), "")
+                    
+                    if len(questions) >= 3:
+                        break
+    
+        # Clean any remaining question-like patterns
+        question_patterns = [
+            r'(?:\n|^)Q\d+:.*?\n',
+            r'(?:\n|^)[A-D]\.\s.*?\n', 
+            r'(?:\n|^)\*[A-D]\.\s.*?\n'
+        ]
+        
+        for pattern in question_patterns:
+            cleaned_content = re.sub(pattern, '\n', cleaned_content, flags=re.MULTILINE)
+        
+        # Final cleanup
+        cleaned_content = re.sub(r'\n{3,}', '\n\n', cleaned_content)  # Remove excessive newlines
+        cleaned_content = cleaned_content.strip()
+        
+        return cleaned_content, questions
+
+    def _create_question_from_match(self, match, seen_questions):
+        """Create a Question object from a regex match object."""
+        question_text = match.group(1).strip()
+        
+        # Skip duplicate questions
+        if question_text in seen_questions:
+            return None
+        
+        seen_questions.add(question_text)
+        
+        raw_options = match.groups()[1:5]
+        options = []
+        correct_found = False
+        
+        for i, opt_text in enumerate(raw_options):
+            text = opt_text.strip()
+            is_correct = False
+            
+            # Detect * anywhere in the text
+            if "*" in text:
+                is_correct = True
+                text = text.replace("*", "").strip()
+                correct_found = True
+            
+            options.append(Option(
+                text=f"{chr(65+i)}. {text}",
+                is_correct=is_correct
+            ))
+        
+        # Fallback: If no correct option detected, just mark A as correct
+        if not correct_found and options:
+            options[0].is_correct = True
+            print(f"Warning: No correct option marked for question '{question_text}'. Defaulting to option A.")
+        
+        return Question(
+            question_text=f"Q{len(seen_questions)}: {question_text}",
+            options=options
+        )
 
     async def generate_lesson_plan(self, 
                            topic: str, 

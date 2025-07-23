@@ -21,7 +21,7 @@ def get_watson_service():
     "/",
     response_model=GenerationResponse,
     summary="Generate content and quiz",
-    description="Generate educational content and quiz questions based on the given topic"
+    description="Generate educational content and quiz questions based on the given topic, optionally enhanced with web search results"
 )
 async def generate_content_and_quiz(
     request: GenerationRequest,
@@ -29,7 +29,10 @@ async def generate_content_and_quiz(
 ):
     """Generate content and quiz questions for a topic"""
     try:
-        result = await service.generate_content_and_quiz(topic=request.topic)
+        result = await service.generate_content_and_quiz(
+            topic=request.topic,
+            use_web_context=request.use_web_context
+        )
         return result
     except Exception as e:
         raise HTTPException(

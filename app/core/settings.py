@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     TEMPERATURE: float = 0.1
     TOP_K: int = 20
     
+    # Google Search API settings
+    GOOGLE_API_KEY: Optional[str] = None
+    GOOGLE_CSE_ID: Optional[str] = None
+    
     model_config = {
         "env_file": ".env",
         "case_sensitive": True,
